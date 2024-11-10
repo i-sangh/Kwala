@@ -1,0 +1,9 @@
+# Dependencies
+node_modules/
+
+# Build output (adjust based on your build tool)
+build/  # For common build tools like Create React App
+dist/  # For frameworks like Nuxt.js
+
+# Development environment variables
+.env
