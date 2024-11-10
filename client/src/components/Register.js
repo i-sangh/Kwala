@@ -7,9 +7,14 @@ import {
     Typography, 
     Box, 
     Alert,
-    Snackbar 
+    Snackbar,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
+import { countries } from '../utils/countryData';
 
 function Register() {
     const [name, setName] = useState('');
@@ -18,21 +23,51 @@ function Register() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
+    const [selectedCountry, setSelectedCountry] = useState('');
+    const [phoneError, setPhoneError] = useState('');
     const navigate = useNavigate();
     const { register } = useAuth();
+
+    const validatePhoneNumber = (number) => {
+        const phoneRegex = /^\d+$/;
+        if (!phoneRegex.test(number)) {
+            return "Phone number can only contain digits";
+        }
+        if (number.length < 7 || number.length > 11) {
+            return "Phone number must be between 7 and 11 digits";
+        }
+        return "";
+    };
+
+    const handlePhoneChange = (e) => {
+        const number = e.target.value;
+        setPhoneNumber(number);
+        const error = validatePhoneNumber(number);
+        setPhoneError(error);
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
 
         try {
-            // Make sure all fields are filled
-            if (!name.trim() || !email.trim() || !phoneNumber.trim() || !password.trim()) {
+            if (!name.trim() || !email.trim() || !phoneNumber.trim() || !password.trim() || !selectedCountry) {
                 setError('All fields are required');
                 return;
             }
 
-            await register(name, email, phoneNumber, password);
+            const phoneError = validatePhoneNumber(phoneNumber);
+            if (phoneError) {
+                setError(phoneError);
+                return;
+            }
+
+            const country = countries.find(c => c.name === selectedCountry);
+            await register(name, email, phoneNumber, password, {
+                name: country.name,
+                phoneCode: country.code
+            });
+            
             setShowSuccess(true);
             navigate('/verify-email', { state: { email } });
         } catch (error) {
@@ -71,13 +106,34 @@ function Register() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                     />
+                    <FormControl fullWidth margin="normal">
+                        <InputLabel>Country</InputLabel>
+                        <Select
+                            value={selectedCountry}
+                            label="Country"
+                            onChange={(e) => setSelectedCountry(e.target.value)}
+                            required
+                        >
+                            {countries.map((country) => (
+                                <MenuItem key={country.name} value={country.name}>
+                                    {country.name} ({country.code})
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
                     <TextField
                         margin="normal"
                         required
                         fullWidth
                         label="Phone Number"
                         value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        onChange={handlePhoneChange}
+                        error={!!phoneError}
+                        helperText={phoneError}
+                        inputProps={{
+                            inputMode: 'numeric',
+                            pattern: '[0-9]*'
+                        }}
                     />
                     <TextField
                         margin="normal"

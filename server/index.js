@@ -34,7 +34,25 @@ const userSchema = new mongoose.Schema({
     phoneNumber: {
         type: String,
         required: [true, 'Phone number is required'],
-        trim: true
+        trim: true,
+        validate: {
+            validator: function(v) {
+                return /^\d{7,11}$/.test(v);
+            },
+            message: props => `${props.value} is not a valid phone number!`
+        }
+    },
+    country: {
+        name: {
+            type: String,
+            required: [true, 'Country name is required'],
+            trim: true
+        },
+        phoneCode: {
+            type: String,
+            required: [true, 'Country phone code is required'],
+            trim: true
+        }
     },
     password: { 
         type: String, 
@@ -113,12 +131,19 @@ const sendResetPasswordEmail = async (email, code) => {
 // Registration Route
 app.post('/api/register', async (req, res) => {
     try {
-        const { name, email, phoneNumber, password } = req.body;
+        const { name, email, phoneNumber, password, country } = req.body;
+
+        // Validate phone number
+        if (!/^\d{7,11}$/.test(phoneNumber)) {
+            return res.status(400).json({
+                error: 'Invalid phone number format'
+            });
+        }
 
         // Check if user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({ 
+            return res.status(400).json({
                 error: 'Email already registered'
             });
         }
@@ -134,6 +159,7 @@ app.post('/api/register', async (req, res) => {
             email, 
             phoneNumber,
             password: hashedPassword,
+            country,
             verificationCode,
             verificationCodeExpires
         });

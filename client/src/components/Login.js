@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { TextField, Button, Container, Typography, Box } from '@mui/material';
+import { TextField, Button, Container, Typography, Box, Alert } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     try {
       await login(email, password);
       navigate('/cover-letter');
     } catch (error) {
-      console.error('Login error:', error);
+      setError(error.response?.data?.error || 'An error occurred');
     }
   };
 
@@ -26,6 +28,7 @@ function Login() {
           Login
         </Typography>
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
+          {error && <Alert severity="error" sx={{ width: '100%' }}>{error}</Alert>}
           <TextField
             margin="normal"
             required
