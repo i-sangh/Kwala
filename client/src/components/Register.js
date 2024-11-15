@@ -11,7 +11,8 @@ import {
     Select,
     MenuItem,
     FormControl,
-    InputLabel
+    InputLabel,
+    CircularProgress
 } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { countries } from '../utils/countryData';
@@ -25,6 +26,7 @@ function Register() {
     const [showSuccess, setShowSuccess] = useState(false);
     const [selectedCountry, setSelectedCountry] = useState('');
     const [phoneError, setPhoneError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
     const { register } = useAuth();
 
@@ -49,16 +51,19 @@ function Register() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setIsLoading(true);
 
         try {
             if (!name.trim() || !email.trim() || !phoneNumber.trim() || !password.trim() || !selectedCountry) {
                 setError('All fields are required');
+                setIsLoading(false);
                 return;
             }
 
             const phoneError = validatePhoneNumber(phoneNumber);
             if (phoneError) {
                 setError(phoneError);
+                setIsLoading(false);
                 return;
             }
 
@@ -72,6 +77,8 @@ function Register() {
             navigate('/verify-email', { state: { email } });
         } catch (error) {
             setError(error.response?.data?.error || 'Registration failed');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -149,8 +156,16 @@ function Register() {
                         fullWidth
                         variant="contained"
                         sx={{ mt: 3, mb: 2 }}
+                        disabled={isLoading}
                     >
-                        Sign Up
+                        {isLoading ? (
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <CircularProgress size={24} sx={{ color: 'white', mr: 1 }} />
+                                Signing Up...
+                            </Box>
+                        ) : (
+                            'Sign Up'
+                        )}
                     </Button>
                     <Link to="/login" style={{ textDecoration: 'none' }}>
                         <Typography color="primary" align="center">

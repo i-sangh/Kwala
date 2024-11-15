@@ -8,79 +8,33 @@ require('dotenv').config();
 
 const app = express();
 
+// Import User model
+const User = require('./models/User');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+    .then(async () => {
+        console.log('Connected to MongoDB');
+        // Force immediate cleanup on server start
+        await User.cleanupExpiredUsers();
+    })
+    .catch((err) => console.error('MongoDB connection error:', err));
 
-// User Schema
-const userSchema = new mongoose.Schema({
-    name: { 
-        type: String, 
-        required: [true, 'Name is required'],
-        trim: true
-    },
-    email: { 
-        type: String, 
-        required: [true, 'Email is required'],
-        unique: true,
-        trim: true,
-        lowercase: true
-    },
-    phoneNumber: {
-        type: String,
-        required: [true, 'Phone number is required'],
-        trim: true,
-        validate: {
-            validator: function(v) {
-                return /^\d{7,11}$/.test(v);
-            },
-            message: props => `${props.value} is not a valid phone number!`
+// Schedule cleanup every minute
+setInterval(async () => {
+    try {
+        const result = await User.cleanupExpiredUsers();
+        if (result.deletedCount > 0) {
+            console.log(`Cleaned up ${result.deletedCount} expired users`);
         }
-    },
-    country: {
-        name: {
-            type: String,
-            required: [true, 'Country name is required'],
-            trim: true
-        },
-        phoneCode: {
-            type: String,
-            required: [true, 'Country phone code is required'],
-            trim: true
-        }
-    },
-    password: { 
-        type: String, 
-        required: [true, 'Password is required']
-    },
-    isVerified: {
-        type: Boolean,
-        default: false
-    },
-    verificationCode: {
-        type: String,
-        default: null
-    },
-    verificationCodeExpires: {
-        type: Date,
-        default: null
-    },
-    resetPasswordCode: {
-        type: String,
-        default: null
-    },
-    resetPasswordCodeExpires: {
-        type: Date,
-        default: null
+    } catch (error) {
+        console.error('Cleanup error:', error);
     }
-}, { timestamps: true });
-
-const User = mongoose.model('User', userSchema);
+}, 60000); // Run every minute
 
 // Nodemailer configuration
 const transporter = nodemailer.createTransport({
@@ -105,7 +59,7 @@ const sendVerificationEmail = async (email, code) => {
         html: `
             <h1>Email Verification</h1>
             <p>Your verification code is: <strong>${code}</strong></p>
-            <p>This code will expire in 10 minutes.</p>
+            <p>This code will expire in 3 minutes.</p>
         `
     };
 
@@ -121,7 +75,7 @@ const sendResetPasswordEmail = async (email, code) => {
         html: `
             <h1>Reset Password</h1>
             <p>Your password reset code is: <strong>${code}</strong></p>
-            <p>This code will expire in 10 minutes.</p>
+            <p>This code will expire in 3 minutes.</p>
         `
     };
 
@@ -148,9 +102,11 @@ app.post('/api/register', async (req, res) => {
             });
         }
 
+        const VERIFICATION_DURATION = 180; // 3 minutes in seconds
+        
         // Generate verification code
         const verificationCode = generateVerificationCode();
-        const verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        const verificationCodeExpires = new Date(Date.now() + VERIFICATION_DURATION * 1000);
 
         // Hash password and create user
         const hashedPassword = await bcrypt.hash(password, 8);
@@ -161,12 +117,13 @@ app.post('/api/register', async (req, res) => {
             password: hashedPassword,
             country,
             verificationCode,
-            verificationCodeExpires
+            verificationCodeExpires,
+            isNewRegistration: true
         });
 
         await user.save();
         
-        // Send verification email
+        // Send verification email with updated message
         await sendVerificationEmail(email, verificationCode);
 
         const token = jwt.sign({ userId: user._id }, 'your_jwt_secret');
@@ -210,6 +167,7 @@ app.post('/api/verify-email', async (req, res) => {
         user.isVerified = true;
         user.verificationCode = null;
         user.verificationCodeExpires = null;
+        user.isNewRegistration = false;  // Mark as not a new registration after verification
         await user.save();
 
         res.json({ 
@@ -236,8 +194,16 @@ app.post('/api/forgot-password', async (req, res) => {
             });
         }
 
+        // Check if a reset code was recently sent (within last minute)
+        if (user.resetPasswordCodeExpires && 
+            user.resetPasswordCodeExpires > Date.now() - 60000) {
+            return res.status(400).json({ 
+                error: 'Please wait before requesting another code'
+            });
+        }
+
         const resetCode = generateVerificationCode();
-        const resetCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+        const resetCodeExpires = new Date(Date.now() + 3 * 60 * 1000); // 3 minutes
 
         user.resetPasswordCode = resetCode;
         user.resetPasswordCodeExpires = resetCodeExpires;
@@ -261,6 +227,12 @@ app.post('/api/forgot-password', async (req, res) => {
 app.post('/api/reset-password', async (req, res) => {
     try {
         const { email, code, newPassword } = req.body;
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ 
+                error: 'Password must be at least 6 characters long'
+            });
+        }
 
         const user = await User.findOne({ 
             email,
@@ -326,6 +298,108 @@ app.post('/api/login', async (req, res) => {
     } catch (error) {
         res.status(400).json({ 
             error: error.message || 'Login failed'
+        });
+    }
+});
+
+// Update the resend-verification route
+app.post('/api/resend-verification', async (req, res) => {
+    try {
+        const { email } = req.body;
+        const VERIFICATION_DURATION = 180; // 3 minutes in seconds
+
+        const user = await User.findOne({ 
+            email,
+            isVerified: false
+        });
+
+        if (!user) {
+            return res.status(400).json({ 
+                error: 'User not found or already verified'
+            });
+        }
+
+        const verificationCode = generateVerificationCode();
+        const verificationCodeExpires = new Date(Date.now() + VERIFICATION_DURATION * 1000);
+
+        user.verificationCode = verificationCode;
+        user.verificationCodeExpires = verificationCodeExpires;
+        await user.save();
+
+        await sendVerificationEmail(email, verificationCode);
+
+        res.json({ 
+            success: true,
+            message: 'New verification code sent'
+        });
+
+    } catch (error) {
+        res.status(400).json({ 
+            error: error.message || 'Failed to resend verification code'
+        });
+    }
+});
+
+// Get verification status
+app.get('/api/verification-status/:email', async (req, res) => {
+    try {
+        const VERIFICATION_DURATION = 180; // 3 minutes in seconds
+        const email = decodeURIComponent(req.params.email);
+        const user = await User.findOne({ 
+            email,
+            isVerified: false,
+            verificationCode: { $ne: null }
+        });
+
+        // Check if user exists and if the verification code has expired
+        if (!user || !user.verificationCodeExpires || user.verificationCodeExpires < Date.now()) {
+            return res.json({ 
+                timeRemaining: 0,
+                exactDuration: 0 // Updated to return exactDuration
+            });
+        }
+
+        const timeRemaining = Math.max(
+            0,
+            Math.floor((user.verificationCodeExpires - Date.now()) / 1000)
+        );
+
+        // Consider it a fresh verification if the code was created within the last 2 seconds
+        const isFreshVerification = (user.verificationCodeExpires.getTime() - Date.now()) >= (VERIFICATION_DURATION * 1000 - 2000);
+
+        res.json({ 
+            timeRemaining,
+            exactDuration: isFreshVerification ? VERIFICATION_DURATION : timeRemaining // Updated to return exactDuration
+        });
+    } catch (error) {
+        res.status(400).json({ 
+            error: error.message || 'Failed to fetch verification status'
+        });
+    }
+});
+
+// Get reset password status
+app.get('/api/reset-password-status/:email', async (req, res) => {
+    try {
+        const email = decodeURIComponent(req.params.email);
+        const user = await User.findOne({ 
+            email,
+            resetPasswordCode: { $ne: null }
+        });
+
+        if (!user || !user.resetPasswordCodeExpires) {
+            return res.json({ timeRemaining: 0 });
+        }
+
+        const timeRemaining = Math.max(
+            0,
+            Math.floor((user.resetPasswordCodeExpires - Date.now()) / 1000)
+        );
+
+        res.json({ timeRemaining });
+    } catch (error) {
+        res.status(400).json({ 
+            error: error.message || 'Failed to fetch reset password status'
         });
     }
 });

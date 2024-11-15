@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
     Container,
     Box,
@@ -7,19 +7,59 @@ import {
     TextField,
     Button,
     Alert,
-    Snackbar
+    Snackbar,
+    CircularProgress
 } from '@mui/material';
 import axios from 'axios';
 
 function ForgotPassword() {
-    const [email, setEmail] = useState('');
+    const [email, setEmail] = useState(useLocation().state?.email || '');
     const [error, setError] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
+    const [timeRemaining, setTimeRemaining] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
+
+    // Fetch initial timer status from server
+    useEffect(() => {
+        const fetchResetStatus = async () => {
+            try {
+                const response = await axios.get(`http://localhost:5000/api/reset-password-status/${encodeURIComponent(email)}`);
+                const { timeRemaining: serverTimeRemaining } = response.data;
+                setTimeRemaining(serverTimeRemaining);
+            } catch (error) {
+                console.error('Error fetching reset password status:', error);
+                setTimeRemaining(0);
+            }
+        };
+
+        // Only fetch the status if the email is not empty
+        if (email) {
+            fetchResetStatus();
+        }
+    }, [email]);
+
+    // Handle timer countdown
+    useEffect(() => {
+        if (timeRemaining === null || timeRemaining <= 0) return;
+
+        const timer = setInterval(() => {
+            setTimeRemaining(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [timeRemaining]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setIsLoading(true);
 
         try {
             await axios.post('http://localhost:5000/api/forgot-password', { email });
@@ -30,7 +70,16 @@ function ForgotPassword() {
             }, 2000);
         } catch (error) {
             setError(error.response?.data?.error || 'Failed to process request');
+        } finally {
+            setIsLoading(false);
         }
+    };
+
+    const formatTime = (seconds) => {
+        if (seconds === null || seconds <= 0) return '00:00'; // Return '00:00' when timeRemaining is null or 0
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     };
 
     return (
@@ -65,8 +114,16 @@ function ForgotPassword() {
                         fullWidth
                         variant="contained"
                         sx={{ mt: 3, mb: 2 }}
+                        disabled={isLoading}
                     >
-                        Send Reset Code
+                        {isLoading ? (
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                <CircularProgress size={24} sx={{ color: 'white', mr: 1 }} />
+                                Sending Code...
+                            </Box>
+                        ) : (
+                            'Send Reset Code'
+                        )}
                     </Button>
                     <Link to="/login" style={{ textDecoration: 'none' }}>
                         <Typography color="primary" align="center">
@@ -74,6 +131,18 @@ function ForgotPassword() {
                         </Typography>
                     </Link>
                 </Box>
+
+                {timeRemaining !== null && timeRemaining > 0 && (
+                    <Typography
+                        sx={{
+                            mb: 2,
+                            color: timeRemaining < 60 ? 'error.main' : 'text.primary',
+                            fontWeight: 'bold'
+                        }}
+                    >
+                        Time Remaining: {formatTime(timeRemaining)}
+                    </Typography>
+                )}
             </Box>
 
             <Snackbar
@@ -82,7 +151,7 @@ function ForgotPassword() {
                 onClose={() => setShowSuccess(false)}
             >
                 <Alert severity="success" sx={{ width: '100%' }}>
-                    Reset code sent! Check your email.
+                    Password reset code sent! Check your email.
                 </Alert>
             </Snackbar>
         </Container>
