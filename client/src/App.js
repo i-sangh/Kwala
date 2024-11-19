@@ -8,10 +8,25 @@ import Navbar from './components/Navbar';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
-import VerifyEmail from './components/VerifyEmail';  // Add this import
+import VerifyEmail from './components/VerifyEmail';
+import EmailReply from './components/EmailReply';
 
 const PrivateRoute = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh' 
+      }}>
+        Loading...
+      </div>
+    );
+  }
+
   return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
@@ -22,7 +37,7 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />  {/* Add this route */}
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route
             path="/cover-letter"
             element={
@@ -38,6 +53,15 @@ function App() {
               <PrivateRoute>
                 <Navbar />
                 <Email />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/email-reply"
+            element={
+              <PrivateRoute>
+                <Navbar />
+                <EmailReply />
               </PrivateRoute>
             }
           />

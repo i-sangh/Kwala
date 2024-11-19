@@ -82,6 +82,29 @@ const sendResetPasswordEmail = async (email, code) => {
     await transporter.sendMail(mailOptions);
 };
 
+// Middleware to verify JWT token
+const verifyToken = (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    console.log('Auth header:', authHeader);
+    
+    if (!authHeader) {
+        console.log('No token provided in headers');
+        return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    try {
+        console.log('Attempting to verify token');
+        const decoded = jwt.verify(token, 'your_jwt_secret');
+        console.log('Token decoded:', decoded);
+        req.userId = decoded.userId;
+        next();
+    } catch (error) {
+        console.error('Token verification failed:', error);
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+};
+
 // Registration Route
 app.post('/api/register', async (req, res) => {
     try {
@@ -209,6 +232,7 @@ app.post('/api/forgot-password', async (req, res) => {
         user.resetPasswordCodeExpires = resetCodeExpires;
         await user.save();
 
+        
         await sendResetPasswordEmail(email, resetCode);
 
         res.json({ 
@@ -401,6 +425,35 @@ app.get('/api/reset-password-status/:email', async (req, res) => {
         res.status(400).json({ 
             error: error.message || 'Failed to fetch reset password status'
         });
+    }
+});
+
+// Chat routes
+app.use('/api/chat', require('./routes/chatRoutes'));
+
+// Add this new endpoint for token verification
+app.get('/api/verify-token', verifyToken, async (req, res) => {
+    try {
+        console.log('Finding user with ID:', req.userId);
+        const user = await User.findById(req.userId);
+        if (!user) {
+            console.log('User not found');
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        console.log('User found, sending response');
+        res.json({
+            success: true,
+            user: {
+                email: user.email,
+                name: user.name,
+                phoneNumber: user.phoneNumber,
+                isVerified: user.isVerified
+            }
+        });
+    } catch (error) {
+        console.error('Server error:', error);
+        res.status(500).json({ error: 'Server error' });
     }
 });
 
