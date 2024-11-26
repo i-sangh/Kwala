@@ -13,20 +13,20 @@ function EmailReply() {
     const [response, setResponse] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [isCopied, setIsCopied] = useState(false);
+    const [isHumanizing, setIsHumanizing] = useState(false);
+    const [isHumanized, setIsHumanized] = useState(false);
 
-    // Check if form has any content
     const hasContent = Boolean(
         originalEmail.trim() || 
         replyContext.trim() || 
         selectedTones.length > 0
     );
 
-    // Function to count words in a string
     const countWords = (text) => {
         return text.trim().split(/\s+/).filter(word => word.length > 0).length;
     };
 
-    // Check if both fields have more than 3 words
     const hasEnoughWords = 
         countWords(originalEmail) > 3 && 
         countWords(replyContext) > 3;
@@ -41,6 +41,26 @@ function EmailReply() {
                     ? [prev[1], tone]
                     : [...prev, tone]
         );
+    };
+
+    const handleClearAll = () => {
+        setOriginalEmail('');
+        setReplyContext('');
+        setSelectedTones([]);
+        setResponse('');
+        setError('');
+    };
+
+    const handleCopyToClipboard = async () => {
+        try {
+            await navigator.clipboard.writeText(response);
+            setIsCopied(true);
+            setTimeout(() => {
+                setIsCopied(false);
+            }, 1000);
+        } catch (err) {
+            setError('Failed to copy to clipboard');
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -85,6 +105,22 @@ ${toneMessage}
         }
     };
 
+    const handleHumanizeContent = async () => {
+        setError('');
+        setIsHumanizing(true);
+        try {
+            const res = await axios.post('http://localhost:5000/api/humanize', { content: response });
+            if (res.data.success) {
+                setResponse(res.data.humanizedContent);
+                setIsHumanized(true);
+            }
+        } catch (err) {
+            setError('Failed to humanize content. Please try again.');
+        } finally {
+            setIsHumanizing(false);
+        }
+    };
+
     return (
         <Container>
             <UnverifiedAlert />
@@ -106,7 +142,7 @@ ${toneMessage}
                     disabled={hasContent}
                     sx={{ minWidth: '200px' }}
                 >
-                    Generate New Reply from Blank
+                    Generate New Email Instead
                 </Button>
             </Box>
 
@@ -153,14 +189,24 @@ ${toneMessage}
                         ))}
                     </Box>
 
-                    <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={loading || !hasEnoughWords}
-                        sx={{ mb: 3 }}
-                    >
-                        {loading ? 'Generating Reply...' : 'Generate Reply'}
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={loading || !hasEnoughWords || response}
+                        >
+                            {loading ? 'Generating Reply...' : 'Generate Reply'}
+                        </Button>
+                        {response && (
+                            <Button 
+                                variant="outlined" 
+                                color="secondary" 
+                                onClick={handleClearAll}
+                            >
+                                Clear All
+                            </Button>
+                        )}
+                    </Box>
                 </form>
 
                 {error && (
@@ -175,8 +221,34 @@ ${toneMessage}
                             Generated Reply:
                         </Typography>
                         <Paper elevation={1} sx={{ p: 3, backgroundColor: '#f5f5f5' }}>
-                            <ReactMarkdown>{response}</ReactMarkdown>
+                            {isHumanized ? (
+                                <div style={{ whiteSpace: 'pre-line' }}>
+                                    {response.split('\n\n').map((paragraph, index) => (
+                                        <Typography key={index} paragraph>
+                                            {paragraph}
+                                        </Typography>
+                                    ))}
+                                </div>
+                            ) : (
+                                <ReactMarkdown>{response}</ReactMarkdown>
+                            )}
                         </Paper>
+                        <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+                            <Button 
+                                variant="outlined" 
+                                onClick={handleCopyToClipboard}
+                                disabled={isCopied}
+                            >
+                                {isCopied ? 'Copied!' : 'Copy to Clipboard'}
+                            </Button>
+                            <Button
+                                onClick={handleHumanizeContent}
+                                variant="outlined"
+                                disabled={isHumanized}
+                            >
+                                {isHumanizing ? 'Humanizing...' : 'Humanize Content'}
+                            </Button>
+                        </Box>
                     </Box>
                 )}
             </Paper>

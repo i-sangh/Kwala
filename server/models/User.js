@@ -11,7 +11,8 @@ const userSchema = new mongoose.Schema({
         required: [true, 'Email is required'],
         unique: true,
         trim: true,
-        lowercase: true
+        lowercase: true,
+        index: true
     },
     phoneNumber: {
         type: String,
@@ -97,12 +98,45 @@ userSchema.statics.cleanupExpiredUsers = async function() {
     });
 };
 
+// Drop existing indexes before creating new ones
+const dropIndexes = async () => {
+    try {
+        await mongoose.connection.collections['users'].dropIndexes();
+        console.log('Dropped all indexes');
+    } catch (error) {
+        console.log('No indexes to drop');
+    }
+};
+
+// Create the model
 const User = mongoose.model('User', userSchema);
 
-// Create TTL index
-User.collection.createIndex(
-    { "deleteAt": 1 },
-    { expireAfterSeconds: 0 }
-);
+// Function to initialize indexes
+const initializeIndexes = async () => {
+    try {
+        // Drop existing indexes
+        await dropIndexes();
+        
+        // Create TTL index
+        await User.collection.createIndex(
+            { "deleteAt": 1 },
+            { expireAfterSeconds: 0 }
+        );
+        
+        // Create email unique index
+        await User.collection.createIndex(
+            { "email": 1 },
+            { unique: true }
+        );
+        
+        console.log('Indexes created successfully');
+    } catch (error) {
+        console.error('Error creating indexes:', error);
+    }
+};
 
-module.exports = User;
+// Export both the model and the initialization function
+module.exports = {
+    User,
+    initializeIndexes
+};

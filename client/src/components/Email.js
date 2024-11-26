@@ -1,5 +1,13 @@
-import React, { useState } from 'react'; // Removed `useEffect`
-import { Container, Typography, TextField, Button, Paper, Box, Chip, Tooltip } from '@mui/material';
+import React, { useState } from 'react';
+import {
+    Container,
+    Typography,
+    TextField,
+    Button,
+    Paper,
+    Box,
+    Chip,
+} from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import UnverifiedAlert from './UnverifiedAlert';
 import axios from 'axios';
@@ -7,14 +15,17 @@ import ReactMarkdown from 'react-markdown';
 
 function Email() {
     const navigate = useNavigate();
+
     const [message, setMessage] = useState('');
     const [customMessage, setCustomMessage] = useState('');
     const [selectedTones, setSelectedTones] = useState([]);
     const [response, setResponse] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [isHumanizing, setIsHumanizing] = useState(false);
+    const [isHumanized, setIsHumanized] = useState(false);
+    const [copied, setCopied] = useState(false); // For copy-to-clipboard feedback
 
-    // Check if form has any content
     const hasContent = Boolean(
         message.trim() || 
         customMessage.trim() || 
@@ -28,160 +39,191 @@ function Email() {
             prev.includes(tone)
                 ? prev.filter((t) => t !== tone)
                 : prev.length === 2
-                    ? [prev[1], tone]
-                    : [...prev, tone]
+                ? [prev[1], tone]
+                : [...prev, tone]
         );
+    };
+
+    const handleClearAll = () => {
+        setMessage('');
+        setCustomMessage('');
+        setSelectedTones([]);
+        setResponse('');
+        setError('');
+        setIsHumanized(false);
+        setIsHumanizing(false);
+    };
+
+    const handleCopyToClipboard = async () => {
+        try {
+            await navigator.clipboard.writeText(response);
+            setCopied(true); // Show "Copied" feedback
+            setTimeout(() => setCopied(false), 1000); // Reset after 1 second
+        } catch (err) {
+            setError('Failed to copy to clipboard');
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
-
+        setIsHumanized(false);
         const modifiedMessage = `
-Help me write a email based on Core Email Content.:
+Help me write an email based on the Core Email Content:
 
-1. **Custom Instructions** (Optional): ${customMessage.trim() ? customMessage : "No additional instructions provided."}
-2. **Tone Preferences**: ${selectedTones.length > 0 ? selectedTones.join(" and ") : "Casual and Friendly"}
+1. **Custom Instructions**: ${customMessage || "None"}
+2. **Tone Preferences**: ${selectedTones.join(" and ") || "Neutral"}
 3. **Core Email Content**: ${message.trim()}
 
-### Key Expectations:
-
-- Try giving the complete email content a friendly tone and make sure to write short and long sentence both in order to make it more human written and not AI generated.
-
-- Add some grammatically wrong sentence, Make the email concise and don't polish it to make it look more professional. 
-`;
-
-
-
+### Expectations:
+- Make it human-like with slight grammatical variations.
+- Use concise yet friendly language.
+        `;
         try {
             const res = await axios.post('http://localhost:5000/api/chat/completion', {
-                message: modifiedMessage
+                message: modifiedMessage,
             });
             setResponse(res.data.response);
-        } catch (error) {
-            console.error('Error:', error);
+        } catch (err) {
             setError('Failed to generate email. Please try again.');
         } finally {
             setLoading(false);
         }
     };
 
-    const downloadResponse = () => {
-        const element = document.createElement('a');
-        const file = new Blob([response], { type: 'text/plain' });
-        element.href = URL.createObjectURL(file);
-        element.download = 'generated_email.txt';
-        document.body.appendChild(element);
-        element.click();
+    const handleHumanizeContent = async () => {
+        setError(''); // Reset error message on retry
+        setIsHumanizing(true);
+        try {
+            const res = await axios.post('http://localhost:5000/api/humanize', { content: response });
+            if (res.data.success) {
+                setResponse(res.data.humanizedContent);
+                setIsHumanized(true);
+            }
+        } catch (err) {
+            setError('Failed to humanize content. Please try again.');
+        } finally {
+            setIsHumanizing(false);
+        }
     };
+
+    // Function to count the words in the message
+    const countWords = (text) => {
+        return text.trim().split(/\s+/).length;
+    };
+
+    // Disable the 'Generate Email' button if fewer than 3 words
+    const isGenerateButtonDisabled = countWords(message) < 3 || loading || response;
 
     return (
         <Container>
             <UnverifiedAlert />
-            <Box 
-                sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center', 
-                    mt: 4, 
-                    mb: 3 
+            <Box
+                sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    mt: 4,
+                    mb: 3,
                 }}
             >
-                <Typography variant="h4">
-                    AI Email Generator
-                </Typography>
+                <Typography variant="h4">AI Email Generator</Typography>
                 <Button
                     variant="contained"
                     onClick={() => navigate('/email-reply')}
                     disabled={hasContent}
-                    sx={{ minWidth: '280px' }}
+                    sx={{ minWidth: '200px' }}
                 >
-                    Generate Reply to Email You Have Received
+                    Generate Email Reply Instead
                 </Button>
             </Box>
-
-            <Paper elevation={3} sx={{ p: 3, mt: 2 }}>
+            <Paper sx={{ p: 3 }}>
                 <form onSubmit={handleSubmit}>
-                    <Typography variant="h6" sx={{ mb: 2 }}>
-                        Select Tone (Optional, max 2):
-                    </Typography>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                    <Typography>Select Tone (Optional, max 2):</Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
                         {tones.map((tone) => (
                             <Chip
                                 key={tone}
                                 label={tone}
+                                color={selectedTones.includes(tone) ? 'primary' : 'default'}
                                 onClick={() => handleToneSelection(tone)}
-                                color={selectedTones.includes(tone) ? "primary" : "default"}
                                 sx={{ cursor: 'pointer' }}
                             />
                         ))}
                     </Box>
-
                     <TextField
+                        label="Custom Instructions"
+                        value={customMessage}
+                        onChange={(e) => setCustomMessage(e.target.value)}
                         fullWidth
                         multiline
                         rows={2}
-                        variant="outlined"
-                        label="Custom Instructions (Optional)"
-                        value={customMessage}
-                        onChange={(e) => setCustomMessage(e.target.value)}
-                        sx={{ mb: 3 }}
+                        sx={{ mb: 2 }}
                     />
-
                     <TextField
-                        fullWidth
-                        multiline
-                        rows={4}
-                        variant="outlined"
                         label="Email Content"
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
+                        fullWidth
+                        multiline
+                        rows={4}
                         required
-                        sx={{ mb: 3 }}
+                        sx={{ mb: 2 }}
                     />
-
-                    <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={loading || message.trim().split(/\s+/).length <= 3}
-                    >
-                        {loading ? 'Generating...' : 'Generate Email'}
-                    </Button>
-                </form>
-
-                {error && (
-                    <Typography color="error" sx={{ mt: 2 }}>
-                        {error}
-                    </Typography>
-                )}
-
-                {response && (
-                    <Box sx={{ mt: 4 }}>
-                        <Typography variant="h6" sx={{ mb: 2 }}>
-                            Generated Email:
-                        </Typography>
-                        <Paper elevation={1} sx={{ p: 3, backgroundColor: '#f5f5f5' }}>
-                            <ReactMarkdown>{response}</ReactMarkdown>
-                        </Paper>
-                        <Tooltip title="Copy to Clipboard">
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={isGenerateButtonDisabled}
+                        >
+                            {loading ? 'Generating...' : 'Generate Email'}
+                        </Button>
+                        {response && (
                             <Button
                                 variant="outlined"
-                                sx={{ mt: 2, mr: 2 }}
-                                onClick={() => navigator.clipboard.writeText(response)}
+                                color="secondary"
+                                onClick={handleClearAll}
                             >
-                                Copy Email
+                                Clear All
                             </Button>
-                        </Tooltip>
-                        <Button
-                            variant="outlined"
-                            sx={{ mt: 2 }}
-                            onClick={downloadResponse}
-                        >
-                            Download Email
-                        </Button>
+                        )}
+                    </Box>
+                </form>
+                {response && (
+                    <Box sx={{ mt: 3 }}>
+                        <Typography>Generated Email:</Typography>
+                        <Paper sx={{ p: 2, mt: 1 }}>
+                            {isHumanized ? (
+                                <div style={{ whiteSpace: 'pre-line' }}>
+                                    {response.split('\n\n').map((paragraph, index) => (
+                                        <Typography key={index} paragraph>
+                                            {paragraph}
+                                        </Typography>
+                                    ))}
+                                </div>
+                            ) : (
+                                <ReactMarkdown>{response}</ReactMarkdown>
+                            )}
+                        </Paper>
+                        <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+                            <Button
+                                onClick={handleCopyToClipboard}
+                                variant="outlined"
+                            >
+                                {copied ? 'Copied' : 'Copy to Clipboard'}
+                            </Button>
+                            <Button
+                                onClick={handleHumanizeContent}
+                                variant="outlined"
+                                disabled={isHumanized}
+                            >
+                                {isHumanizing ? 'Humanizing...' : 'Humanize Content'}
+                            </Button>
+                        </Box>
                     </Box>
                 )}
+                {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
             </Paper>
         </Container>
     );

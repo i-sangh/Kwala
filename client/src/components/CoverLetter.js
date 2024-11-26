@@ -11,6 +11,9 @@ function CoverLetter() {
     const [response, setResponse] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [isHumanizing, setIsHumanizing] = useState(false);
+    const [isHumanized, setIsHumanized] = useState(false);
+    const [copied, setCopied] = useState(false);
 
     const tones = ["Empathetic", "Optimistic", "Formal", "Informal", "Humorous", "Neutral"];
 
@@ -24,10 +27,21 @@ function CoverLetter() {
         );
     };
 
+    const handleClearAll = () => {
+        setMessage('');
+        setCustomMessage('');
+        setSelectedTones([]);
+        setResponse('');
+        setError('');
+        setIsHumanized(false);
+        setIsHumanizing(false);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError('');
+        setIsHumanized(false);
 
         const toneMessage = selectedTones.length
             ? `Give me the reply in ${selectedTones.join(" and ")} tone(s).`
@@ -60,6 +74,63 @@ Make sure the cover letter is well-structured, concise, and tailored to the job 
             setLoading(false);
         }
     };
+
+    const handleCopyToClipboard = async () => {
+        try {
+            await navigator.clipboard.writeText(response);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1000);
+        } catch (err) {
+            setError('Failed to copy to clipboard');
+        }
+    };
+
+    const formatContent = (content) => {
+        const lines = content.split('\n');
+        const formattedLines = [];
+        
+        lines.forEach((line) => {
+            const boldMatch = line.match(/\*\*(.*?)\*\*/);
+
+            if (boldMatch) {
+                const boldText = boldMatch[1];
+                if (formattedLines.length > 0 && formattedLines[formattedLines.length - 1].trim() !== '') {
+                    formattedLines.push('');
+                }
+                formattedLines.push(`**${boldText}**`);
+                formattedLines.push('');
+            } else if (line.trim() !== '') {
+                formattedLines.push(line.trim());
+            }
+
+            if (line.trim() === '' && formattedLines[formattedLines.length - 1] !== '') {
+                formattedLines.push('');
+            }
+        });
+
+        return formattedLines
+            .filter((line, i, arr) => !(line === '' && arr[i - 1] === ''))
+            .join('\n');
+    };
+
+    const handleHumanizeContent = async () => {
+        setError('');
+        setIsHumanizing(true);
+        try {
+            const res = await axios.post('http://localhost:5000/api/humanize', { content: response });
+            if (res.data.success) {
+                const formattedContent = formatContent(res.data.humanizedContent);
+                setResponse(formattedContent);
+                setIsHumanized(true);
+            }
+        } catch (err) {
+            setError('Failed to humanize content. Please try again.');
+        } finally {
+            setIsHumanizing(false);
+        }
+    };
+
+    const isGenerateButtonDisabled = message.trim().split(/\s+/).length < 3 || loading || response;
 
     return (
         <Container>
@@ -108,14 +179,24 @@ Make sure the cover letter is well-structured, concise, and tailored to the job 
                         sx={{ mb: 3 }}
                     />
 
-                    <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={loading || message.trim().split(/\s+/).length <= 3}
-                        sx={{ mb: 3 }}
-                    >
-                        {loading ? 'Generating...' : 'Generate Cover Letter'}
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={isGenerateButtonDisabled}
+                        >
+                            {loading ? 'Generating...' : 'Generate Cover Letter'}
+                        </Button>
+                        {response && !isHumanizing && (
+                            <Button
+                                variant="outlined"
+                                color="secondary"
+                                onClick={handleClearAll}
+                            >
+                                Clear All
+                            </Button>
+                        )}
+                    </Box>
                 </form>
 
                 {error && (
@@ -130,8 +211,29 @@ Make sure the cover letter is well-structured, concise, and tailored to the job 
                             Generated Cover Letter:
                         </Typography>
                         <Paper elevation={1} sx={{ p: 3, backgroundColor: '#f5f5f5' }}>
-                            <ReactMarkdown>{response}</ReactMarkdown>
+                            {isHumanized ? (
+                                <div style={{ whiteSpace: 'pre-line' }}>
+                                    <ReactMarkdown>{response}</ReactMarkdown>
+                                </div>
+                            ) : (
+                                <ReactMarkdown>{response}</ReactMarkdown>
+                            )}
                         </Paper>
+                        <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+                            <Button
+                                onClick={handleCopyToClipboard}
+                                variant="outlined"
+                            >
+                                {copied ? 'Copied' : 'Copy to Clipboard'}
+                            </Button>
+                            <Button
+                                onClick={handleHumanizeContent}
+                                variant="outlined"
+                                disabled={isHumanized}
+                            >
+                                {isHumanizing ? 'Humanizing...' : 'Humanize Content'}
+                            </Button>
+                        </Box>
                     </Box>
                 )}
             </Paper>

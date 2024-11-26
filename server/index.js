@@ -5,11 +5,12 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
+const humanizeRoutes = require('./routes/humanizeRoutes');
 
 const app = express();
 
 // Import User model
-const User = require('./models/User');
+const { User, initializeIndexes } = require('./models/User');
 
 // Middleware
 app.use(cors());
@@ -19,6 +20,8 @@ app.use(express.json());
 mongoose.connect(process.env.MONGODB_URI)
     .then(async () => {
         console.log('Connected to MongoDB');
+        // Initialize indexes
+        await initializeIndexes();
         // Force immediate cleanup on server start
         await User.cleanupExpiredUsers();
     })
@@ -456,6 +459,9 @@ app.get('/api/verify-token', verifyToken, async (req, res) => {
         res.status(500).json({ error: 'Server error' });
     }
 });
+
+// Add this near your other route definitions
+app.use('/api/humanize', humanizeRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

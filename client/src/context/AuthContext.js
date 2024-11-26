@@ -95,6 +95,33 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(false);
     };
 
+    const register = async (name, email, phoneNumber, password, country) => {
+        try {
+            console.log('Attempting registration...');
+            const response = await axios.post('http://localhost:5000/api/register', {
+                name,
+                email,
+                phoneNumber,
+                password,
+                country
+            });
+
+            console.log('Registration response:', response.data);
+
+            if (response.data.success) {
+                const { token, user } = response.data;
+                console.log('Registration successful, setting token and user');
+                setAuthToken(token);
+                setUser(user);
+                setIsAuthenticated(true);
+                return response.data;
+            }
+        } catch (error) {
+            console.error('Registration error:', error.response?.data || error.message);
+            throw error;
+        }
+    };
+
     // Add state debug log
     useEffect(() => {
         console.log('Auth state updated:', {
@@ -110,6 +137,7 @@ export const AuthProvider = ({ children }) => {
             user, 
             login, 
             logout,
+            register,
             loading 
         }}>
             {!loading ? children : (
