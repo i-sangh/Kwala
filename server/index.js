@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 const humanizeRoutes = require('./routes/humanizeRoutes');
+const path = require('path');
 
 const app = express();
 
@@ -462,6 +463,12 @@ app.get('/api/verify-token', verifyToken, async (req, res) => {
 
 // Add this near your other route definitions
 app.use('/api/humanize', humanizeRoutes);
+
+app.use(express.static(path.join(__dirname, '../client/build')));
+
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
