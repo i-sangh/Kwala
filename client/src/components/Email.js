@@ -24,7 +24,7 @@ function Email() {
     const [error, setError] = useState('');
     const [isHumanizing, setIsHumanizing] = useState(false);
     const [isHumanized, setIsHumanized] = useState(false);
-    const [copied, setCopied] = useState(false); // For copy-to-clipboard feedback
+    const [copied, setCopied] = useState(false);
 
     const hasContent = Boolean(
         message.trim() || 
@@ -57,10 +57,19 @@ function Email() {
     const handleCopyToClipboard = async () => {
         try {
             await navigator.clipboard.writeText(response);
-            setCopied(true); // Show "Copied" feedback
-            setTimeout(() => setCopied(false), 1000); // Reset after 1 second
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1000);
         } catch (err) {
             setError('Failed to copy to clipboard');
+        }
+    };
+
+    const handleCopyAndTest = async () => {
+        try {
+            await navigator.clipboard.writeText(response);
+            window.open('https://quillbot.com/ai-content-detector', '_blank');
+        } catch (err) {
+            setError('Failed to copy or redirect');
         }
     };
 
@@ -93,7 +102,7 @@ Help me write an email based on the Core Email Content:
     };
 
     const handleHumanizeContent = async () => {
-        setError(''); // Reset error message on retry
+        setError('');
         setIsHumanizing(true);
         try {
             const res = await axios.post('http://localhost:5000/api/humanize', { content: response });
@@ -108,12 +117,10 @@ Help me write an email based on the Core Email Content:
         }
     };
 
-    // Function to count the words in the message
     const countWords = (text) => {
         return text.trim().split(/\s+/).length;
     };
 
-    // Disable the 'Generate Email' button if fewer than 3 words
     const isGenerateButtonDisabled = countWords(message) < 3 || loading || response;
 
     return (
@@ -179,7 +186,7 @@ Help me write an email based on the Core Email Content:
                         >
                             {loading ? 'Generating...' : 'Generate Email'}
                         </Button>
-                        {response && (
+                        {response && !isHumanizing && (
                             <Button
                                 variant="outlined"
                                 color="secondary"
@@ -206,20 +213,31 @@ Help me write an email based on the Core Email Content:
                                 <ReactMarkdown>{response}</ReactMarkdown>
                             )}
                         </Paper>
-                        <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-                            <Button
-                                onClick={handleCopyToClipboard}
-                                variant="outlined"
-                            >
-                                {copied ? 'Copied' : 'Copy to Clipboard'}
-                            </Button>
-                            <Button
-                                onClick={handleHumanizeContent}
-                                variant="outlined"
-                                disabled={isHumanized}
-                            >
-                                {isHumanizing ? 'Humanizing...' : 'Humanize Content'}
-                            </Button>
+                        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Box sx={{ display: 'flex', gap: 2 }}>
+                                <Button
+                                    onClick={handleCopyToClipboard}
+                                    variant="outlined"
+                                >
+                                    {copied ? 'Copied' : 'Copy to Clipboard'}
+                                </Button>
+                                <Button
+                                    onClick={handleHumanizeContent}
+                                    variant="outlined"
+                                    disabled={isHumanized}
+                                >
+                                    {isHumanizing ? 'Humanizing...' : 'Humanize Content'}
+                                </Button>
+                            </Box>
+                            {!isHumanizing && (
+                                <Button
+                                    onClick={handleCopyAndTest}
+                                    variant="outlined"
+                                    sx={{ borderColor: 'red', color: 'red' }}
+                                >
+                                    Copy and Analyze Text
+                                </Button>
+                            )}
                         </Box>
                     </Box>
                 )}

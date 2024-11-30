@@ -85,6 +85,15 @@ Make sure the cover letter is well-structured, concise, and tailored to the job 
         }
     };
 
+    const handleCopyAndTest = async () => {
+        try {
+            await navigator.clipboard.writeText(response);
+            window.open('https://quillbot.com/ai-content-detector', '_blank');
+        } catch (err) {
+            setError('Failed to copy or redirect');
+        }
+    };
+
     const formatContent = (content) => {
         const lines = content.split('\n');
         const formattedLines = [];
@@ -211,28 +220,37 @@ Make sure the cover letter is well-structured, concise, and tailored to the job 
                             Generated Cover Letter:
                         </Typography>
                         <Paper elevation={1} sx={{ p: 3, backgroundColor: '#f5f5f5' }}>
-                            {isHumanized ? (
-                                <div style={{ whiteSpace: 'pre-line' }}>
-                                    <ReactMarkdown>{response}</ReactMarkdown>
-                                </div>
-                            ) : (
+                            <div style={{ whiteSpace: 'pre-line' }}>
                                 <ReactMarkdown>{response}</ReactMarkdown>
-                            )}
+                            </div>
                         </Paper>
-                        <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-                            <Button
-                                onClick={handleCopyToClipboard}
-                                variant="outlined"
-                            >
-                                {copied ? 'Copied' : 'Copy to Clipboard'}
-                            </Button>
-                            <Button
-                                onClick={handleHumanizeContent}
-                                variant="outlined"
-                                disabled={isHumanized}
-                            >
-                                {isHumanizing ? 'Humanizing...' : 'Humanize Content'}
-                            </Button>
+                        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between' }}>
+                            <Box sx={{ display: 'flex', gap: 2 }}>
+                                <Button
+                                    onClick={handleCopyToClipboard}
+                                    variant="outlined"
+                                >
+                                    {copied ? 'Copied' : 'Copy to Clipboard'}
+                                </Button>
+                                <Button
+                                    onClick={handleHumanizeContent}
+                                    variant="outlined"
+                                    disabled={isHumanized}
+                                >
+                                    {isHumanizing ? 'Humanizing...' : 'Humanize Content'}
+                                </Button>
+                            </Box>
+                            {!isHumanizing && (
+                                <Box>
+                                    <Button
+                                        onClick={handleCopyAndTest}
+                                        variant="outlined"
+                                        sx={{ borderColor: 'red', color: 'red' }}
+                                    >
+                                        Copy and Test Content Accuracy
+                                    </Button>
+                                </Box>
+                            )}
                         </Box>
                     </Box>
                 )}

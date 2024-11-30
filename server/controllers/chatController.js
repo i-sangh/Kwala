@@ -6,7 +6,7 @@ const chatController = {
             const { message } = req.body;
             
             const groq = new Groq({
-                apiKey: process.env.GROQ_API_KEY,
+                apiKey: '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',
             });
             
             const formattedPrompt = `${message}\n\nPlease format the response with clear paragraph breaks using double newlines, use "**" for headers, and maintain a clear structure with proper spacing.`;
@@ -18,9 +18,10 @@ const chatController = {
                         content: formattedPrompt
                     }
                 ],
-                model: "llama-3.2-11b-text-preview",
+                model: "llama3-8b-8192",
                 temperature: 0.7,
                 max_tokens: 2048,
+                top_p: 1,
                 stream: false
             });
 
@@ -35,6 +36,7 @@ const chatController = {
             
             res.json({ response });
         } catch (error) {
+            console.error('Groq API Error:', error);
             res.status(500).json({ error: error.message });
         }
     }

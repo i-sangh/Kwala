@@ -16,6 +16,7 @@ function EmailReply() {
     const [isCopied, setIsCopied] = useState(false);
     const [isHumanizing, setIsHumanizing] = useState(false);
     const [isHumanized, setIsHumanized] = useState(false);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     const hasContent = Boolean(
         originalEmail.trim() || 
@@ -49,6 +50,8 @@ function EmailReply() {
         setSelectedTones([]);
         setResponse('');
         setError('');
+        setIsHumanized(false);
+        setIsAnalyzing(false);
     };
 
     const handleCopyToClipboard = async () => {
@@ -63,6 +66,28 @@ function EmailReply() {
         }
     };
 
+    const handleAnalyzeText = async () => {
+        setIsAnalyzing(true);
+        try {
+            // First copy the text
+            await navigator.clipboard.writeText(response);
+            
+            // Then analyze it
+            const analysisResult = await axios.post('http://localhost:5000/api/analyze', {
+                content: response
+            });
+            
+            if (analysisResult.data.success) {
+                // Handle successful analysis
+                console.log('Analysis completed:', analysisResult.data);
+            }
+        } catch (err) {
+            setError('Failed to analyze text. Please try again.');
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -70,7 +95,7 @@ function EmailReply() {
 
         const toneMessage = selectedTones.length
             ? `Write the email reply in ${selectedTones.join(" and ")} tone(s).`
-            : 'Write the email reply in a frindly tone.';
+            : 'Write the email reply in a friendly tone.';
 
         const modifiedMessage = `
 Help me write a reply to the Original email content, Generate the reply as said in Context for Reply.:
@@ -89,7 +114,7 @@ ${toneMessage}
 1. **More conversational tone**: Use a more relaxed and informal tone, which is characteristic of human communication.
 2. **Personal touch**: Include a personal anecdote and a bit of a personal touch, which makes the text sound more authentic and less formulaic.
 3. **Descriptive language**: Use more vivid and descriptive language to paint a picture in the reader's mind.
-4. **Concise and natural language**: Cut out unnecessary words and used a more natural flow, which makes the text sound more like something a human would write.
+4. **Concise and natural language**: Cut out unnecessary words and use a more natural flow, which makes the text sound more like something a human would write.
 `;
 
         try {
@@ -197,7 +222,7 @@ ${toneMessage}
                         >
                             {loading ? 'Generating Reply...' : 'Generate Reply'}
                         </Button>
-                        {response && (
+                        {response && !isHumanizing && (
                             <Button 
                                 variant="outlined" 
                                 color="secondary" 
@@ -233,21 +258,51 @@ ${toneMessage}
                                 <ReactMarkdown>{response}</ReactMarkdown>
                             )}
                         </Paper>
-                        <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
-                            <Button 
-                                variant="outlined" 
-                                onClick={handleCopyToClipboard}
-                                disabled={isCopied}
-                            >
-                                {isCopied ? 'Copied!' : 'Copy to Clipboard'}
-                            </Button>
-                            <Button
-                                onClick={handleHumanizeContent}
-                                variant="outlined"
-                                disabled={isHumanized}
-                            >
-                                {isHumanizing ? 'Humanizing...' : 'Humanize Content'}
-                            </Button>
+                        <Box sx={{ 
+                            mt: 2, 
+                            display: 'flex', 
+                            gap: 2,
+                            justifyContent: 'space-between'
+                        }}>
+                            <Box sx={{ display: 'flex', gap: 2 }}>
+                                <Button 
+                                    variant="outlined" 
+                                    onClick={handleCopyToClipboard}
+                                    disabled={isCopied}
+                                >
+                                    {isCopied ? 'Copied!' : 'Copy to Clipboard'}
+                                </Button>
+                                <Button
+                                    onClick={handleHumanizeContent}
+                                    variant="outlined"
+                                    disabled={isHumanized || isHumanizing}
+                                >
+                                    {isHumanizing ? 'Humanizing...' : 'Humanize Content'}
+                                </Button>
+                            </Box>
+                            {!isHumanizing && (
+                                <Box sx={{ marginLeft: 'auto' }}>
+                                    <Button
+                                        variant="outlined"
+                                        onClick={handleAnalyzeText}
+                                        disabled={isHumanizing || isAnalyzing}
+                                        sx={{
+                                            borderColor: 'red',
+                                            color: 'red',
+                                            '&:hover': {
+                                                borderColor: '#ff0000',
+                                                backgroundColor: 'rgba(255, 0, 0, 0.04)'
+                                            },
+                                            '&.Mui-disabled': {
+                                                borderColor: 'rgba(255, 0, 0, 0.38)',
+                                                color: 'rgba(255, 0, 0, 0.38)'
+                                            }
+                                        }}
+                                    >
+                                        {isAnalyzing ? 'Analyzing...' : 'Copy and Analyze Text'}
+                                    </Button>
+                                </Box>
+                            )}
                         </Box>
                     </Box>
                 )}

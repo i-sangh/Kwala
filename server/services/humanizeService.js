@@ -1,8 +1,6 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const nlp = require('compromise');
-const fs = require('fs');
-const path = require('path');
 
 puppeteer.use(StealthPlugin());
 
@@ -10,7 +8,6 @@ class HumanizeService {
     constructor() {
         this.browser = null;
         this.isInitialized = false;
-        this.screenshotDir = 'C:\\Users\\sangh\\OneDrive\\Pictures\\Screenshots'; // Screenshot directory
     }
 
     async initialize() {
@@ -71,17 +68,15 @@ class HumanizeService {
         }
     }
 
-    async captureScreenshot(page, step) {
-        try {
-            if (!fs.existsSync(this.screenshotDir)) {
-                fs.mkdirSync(this.screenshotDir, { recursive: true });
-            }
-            const filePath = path.join(this.screenshotDir, `screenshot_${step}.png`);
-            await page.screenshot({ path: filePath }); // Captures only the visible portion of the screen
-            console.log(`Screenshot taken: ${filePath}`);
-        } catch (err) {
-            console.error('Failed to take screenshot:', err);
+    // Randomized fast typing
+    async typeContent(page, selector, content) {
+        for (const char of content) {
+            await page.type(selector, char, { delay: this.randomTypingDelay(1, 3) });
         }
+    }
+
+    randomTypingDelay(min, max) {
+        return Math.floor(Math.random() * (0.5 - 0.1 + 1)) + 0.1;
     }
 
     async humanizeContent(content) {
@@ -100,27 +95,26 @@ class HumanizeService {
                 waitUntil: 'networkidle2',
                 timeout: 60000
             });
-            await this.captureScreenshot(page, 'navigated_to_humanizeai');
 
             console.log('Waiting for textarea...');
             const inputSelector = 'textarea.InputContainer_inputContainer__jeGwX';
             await page.waitForSelector(inputSelector, { timeout: 30000 });
-            await this.captureScreenshot(page, 'textarea_found');
 
-            console.log('Typing content...');
-            await page.type(inputSelector, content);
+            console.log('Typing content into textarea...');
+            await page.focus(inputSelector);
+            await this.typeContent(page, inputSelector, content);
+
+            console.log('Waiting 0.5 seconds before clicking Humanize AI button...');
+            await new Promise((resolve) => setTimeout(resolve, 500));
 
             console.log('Clicking the Humanize AI button...');
             const buttonSelector = 'button.ParaphraseButton_button__nWdlZ';
             await page.waitForSelector(buttonSelector, { timeout: 30000 });
             await page.click(buttonSelector);
-            await this.captureScreenshot(page, 'clicked_humanize_button');
 
-            // Wait for 25 seconds to ensure content generation, just like in the old version
-            console.log('Waiting 25 seconds for humanized content to be generated...');
+            console.log('Waiting 15 seconds for humanized content to be generated...');
             await page.waitForSelector('.OutputContainer_output__wvgeh', { timeout: 30000 });
-            await new Promise((resolve) => setTimeout(resolve, 25000));
-            await this.captureScreenshot(page, 'after_wait_period');
+            await new Promise((resolve) => setTimeout(resolve, 15000));
 
             console.log('Extracting formatted content...');
             const formattedContent = await page.evaluate(() => {
@@ -128,40 +122,32 @@ class HumanizeService {
                     const fragments = [];
                     let currentParagraph = [];
                     
-                    // Process all child nodes
                     const traverse = (node) => {
                         if (node.nodeType === Node.TEXT_NODE) {
                             const text = node.textContent.trim();
                             if (text) currentParagraph.push(text);
-                        } 
-                        else if (node.tagName === 'BR') {
+                        } else if (node.tagName === 'BR') {
                             if (currentParagraph.length > 0) {
                                 fragments.push(currentParagraph.join(' '));
                                 currentParagraph = [];
                             }
-                            fragments.push('');  // Add empty string for line break
-                        }
-                        else {
-                            // Handle nested elements
+                            fragments.push('');
+                        } else {
                             node.childNodes.forEach(traverse);
-                            
-                            // Check if this is a block-level or special span
                             const isBlockOrSpecial = node.className && (
                                 node.className.includes('Editor_t__not_edited_long__JuNNx') ||
                                 node.className.includes('OutputContainer_output__wvgeh')
                             );
-                            
                             if (isBlockOrSpecial && currentParagraph.length > 0) {
                                 fragments.push(currentParagraph.join(' '));
                                 currentParagraph = [];
-                                fragments.push('');  // Add extra line break
+                                fragments.push('');
                             }
                         }
                     };
 
                     traverse(element);
                     
-                    // Add any remaining text
                     if (currentParagraph.length > 0) {
                         fragments.push(currentParagraph.join(' '));
                     }
@@ -174,25 +160,23 @@ class HumanizeService {
 
                 const textFragments = processTextContent(outputContainer);
                 
-                // Format the final content
                 return textFragments
                     .join('\n')
-                    .replace(/\n{3,}/g, '\n')     // Replace 3+ newlines with 1
-                    .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
-                    .split('\n')                    // Split into lines
-                    .map(line => line.trim())       // Trim each line
-                    .join('\n')                     // Join back with newlines
-                    .trim();                        // Trim the entire text
+                    .replace(/\n{3,}/g, '\n')
+                    .replace(/\s+/g, ' ')
+                    .split('\n')
+                    .map(line => line.trim())
+                    .join('\n')
+                    .trim();
             });
 
             if (!formattedContent) {
                 throw new Error('No content generated');
             }
 
-            // Post-process the content to ensure proper markdown formatting
             const finalContent = formattedContent
-                .replace(/\*\*(.*?)\*\*/g, '\n**$1**\n')  // Add newlines around headers
-                .replace(/\n{3,}/g, '\n\n')               // Clean up excessive newlines
+                .replace(/\*\*(.*?)\*\*/g, '\n**$1**\n')
+                .replace(/\n{3,}/g, '\n\n')
                 .trim();
 
             console.log('Content humanized successfully');
@@ -201,7 +185,6 @@ class HumanizeService {
 
         } catch (err) {
             console.error('Error during humanization:', err);
-            if (page) await this.captureScreenshot(page, 'error_occurred');
             throw new Error('Failed to humanize content: ' + err.message);
         } finally {
             await this.cleanup();
