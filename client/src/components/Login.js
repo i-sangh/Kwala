@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { TextField, Button, Container, Typography, Box, Alert } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../utils/api';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -14,7 +15,7 @@ function Login() {
     e.preventDefault();
     setError('');
     try {
-      await login(email, password);
+      await login(email, password, API_URL);
       navigate('/cover-letter');
     } catch (error) {
       setError(error.response?.data?.error || 'An error occurred');

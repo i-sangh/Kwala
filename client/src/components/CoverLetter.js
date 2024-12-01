@@ -63,7 +63,7 @@ Make sure the cover letter is well-structured, concise, and tailored to the job 
 `;
 
         try {
-            const res = await axios.post('http://localhost:5000/api/chat/completion', {
+            const res = await axios.post(`${API_URL}/api/chat/completion`, {
                 message: modifiedMessage
             });
             setResponse(res.data.response);
@@ -126,7 +126,7 @@ Make sure the cover letter is well-structured, concise, and tailored to the job 
         setError('');
         setIsHumanizing(true);
         try {
-            const res = await axios.post('http://localhost:5000/api/humanize', { content: response });
+            const res = await axios.post(`${API_URL}/api/humanize`, { content: response });
             if (res.data.success) {
                 const formattedContent = formatContent(res.data.humanizedContent);
                 setResponse(formattedContent);

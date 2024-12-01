@@ -90,7 +90,7 @@ Help me write an email based on the Core Email Content:
 - Use concise yet friendly language.
         `;
         try {
-            const res = await axios.post('http://localhost:5000/api/chat/completion', {
+            const res = await axios.post(`${API_URL}/api/chat/completion`, {
                 message: modifiedMessage,
             });
             setResponse(res.data.response);
@@ -105,7 +105,7 @@ Help me write an email based on the Core Email Content:
         setError('');
         setIsHumanizing(true);
         try {
-            const res = await axios.post('http://localhost:5000/api/humanize', { content: response });
+            const res = await axios.post(`${API_URL}/api/humanize`, { content: response });
             if (res.data.success) {
                 setResponse(res.data.humanizedContent);
                 setIsHumanized(true);

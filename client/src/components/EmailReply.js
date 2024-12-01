@@ -118,7 +118,7 @@ ${toneMessage}
 `;
 
         try {
-            const res = await axios.post('http://localhost:5000/api/chat/completion', {
+            const res = await axios.post(`${API_URL}/api/chat/completion`, {
                 message: modifiedMessage
             });
             setResponse(res.data.response);
@@ -134,7 +134,7 @@ ${toneMessage}
         setError('');
         setIsHumanizing(true);
         try {
-            const res = await axios.post('http://localhost:5000/api/humanize', { content: response });
+            const res = await axios.post(`${API_URL}/api/humanize`, { content: response });
             if (res.data.success) {
                 setResponse(res.data.humanizedContent);
                 setIsHumanized(true);
@@ -283,23 +283,12 @@ ${toneMessage}
                             {!isHumanizing && (
                                 <Box sx={{ marginLeft: 'auto' }}>
                                     <Button
-                                        variant="outlined"
+                                        variant="contained"
+                                        color="success"
+                                        disabled={isAnalyzing}
                                         onClick={handleAnalyzeText}
-                                        disabled={isHumanizing || isAnalyzing}
-                                        sx={{
-                                            borderColor: 'red',
-                                            color: 'red',
-                                            '&:hover': {
-                                                borderColor: '#ff0000',
-                                                backgroundColor: 'rgba(255, 0, 0, 0.04)'
-                                            },
-                                            '&.Mui-disabled': {
-                                                borderColor: 'rgba(255, 0, 0, 0.38)',
-                                                color: 'rgba(255, 0, 0, 0.38)'
-                                            }
-                                        }}
                                     >
-                                        {isAnalyzing ? 'Analyzing...' : 'Copy and Analyze Text'}
+                                        {isAnalyzing ? 'Analyzing...' : 'Analyze Content'}
                                     </Button>
                                 </Box>
                             )}

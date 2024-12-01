@@ -11,6 +11,7 @@ import {
     CircularProgress
 } from '@mui/material';
 import axios from 'axios';
+import { API_URL } from '../utils/api';
 
 function ForgotPassword() {
     const [email, setEmail] = useState(useLocation().state?.email || '');
@@ -24,7 +25,7 @@ function ForgotPassword() {
     useEffect(() => {
         const fetchResetStatus = async () => {
             try {
-                const response = await axios.get(`http://localhost:5000/api/reset-password-status/${encodeURIComponent(email)}`);
+                const response = await axios.get(`${API_URL}/api/reset-password-status/${encodeURIComponent(email)}`);
                 const { timeRemaining: serverTimeRemaining } = response.data;
                 setTimeRemaining(serverTimeRemaining);
             } catch (error) {
@@ -62,7 +63,7 @@ function ForgotPassword() {
         setIsLoading(true);
 
         try {
-            await axios.post('http://localhost:5000/api/forgot-password', { email });
+            await axios.post(`${API_URL}/api/forgot-password`, { email });
             setShowSuccess(true);
             // Navigate to reset password page after showing success message
             setTimeout(() => {
