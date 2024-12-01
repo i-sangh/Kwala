@@ -11,6 +11,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import UnverifiedAlert from './UnverifiedAlert';
 import axios from 'axios';
+import { API_URL } from '../utils/api';
 import ReactMarkdown from 'react-markdown';
 
 function Email() {

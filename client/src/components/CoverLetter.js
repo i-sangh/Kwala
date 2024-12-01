@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Container, Typography, TextField, Button, Box, Chip, Paper } from '@mui/material';
 import UnverifiedAlert from './UnverifiedAlert';
 import axios from 'axios';
+import { API_URL } from '../utils/api';
 import ReactMarkdown from 'react-markdown';
 
 function CoverLetter() {
