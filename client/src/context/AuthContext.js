@@ -68,6 +68,7 @@ export const AuthProvider = ({ children }) => {
     const login = async (email, password) => {
         try {
             console.log('Attempting login...');
+            console.log('Using API URL:', API_URL); // New line
             const response = await axios.post(`${API_URL}/api/login`, {
                 email,
                 password,
@@ -84,7 +85,9 @@ export const AuthProvider = ({ children }) => {
                 return response.data;
             }
         } catch (error) {
-            console.error('Login error:', error.response?.data || error.message);
+            console.error('Login error:', error);
+            console.error('Error response:', error.response);  // New line
+            console.error('Error request URL:', error.config?.url);  // New line
             throw error;
         }
     };
@@ -99,6 +102,8 @@ export const AuthProvider = ({ children }) => {
     const register = async (name, email, phoneNumber, password, country) => {
         try {
             console.log('Attempting registration...');
+            console.log('Using API URL:', API_URL); // New line
+            console.log('Registration data:', { name, email, phoneNumber, country }); // New line
             const response = await axios.post(`${API_URL}/api/register`, {
                 name,
                 email,
@@ -118,7 +123,9 @@ export const AuthProvider = ({ children }) => {
                 return response.data;
             }
         } catch (error) {
-            console.error('Registration error:', error.response?.data || error.message);
+            console.error('Registration error:', error);
+            console.error('Error response:', error.response);  // New line
+            console.error('Error request URL:', error.config?.url);  // New line
             throw error;
         }
     };
