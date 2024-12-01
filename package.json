@@ -2,14 +2,15 @@
     "name": "mern-email-cover",
     "version": "1.0.0",
     "scripts": {
-        "install-client": "cd client && npm install",
-        "install-server": "cd server && npm install",
-        "install": "npm run install-client && npm run install-server",
-        "build": "cd client && npm run build",
-        "server": "cd server && node index.js",
-        "start": "cd server && node index.js"
+      "install-client": "cd client && npm install --force",
+      "install-server": "cd server && npm install",
+      "install": "npm run install-client && npm run install-server",
+      "build": "cd client && npm run build",
+      "server": "cd server && node index.js",
+      "start": "cd server && node index.js"
     },
     "devDependencies": {
-        "npm-run-all": "^4.1.5"
+      "npm-run-all": "^4.1.5"
     }
-}
+  }
+  

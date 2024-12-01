@@ -16,11 +16,12 @@
     "react-markdown": "^9.0.1",
     "react-router-dom": "^6.28.0",
     "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "eslint": "^8.45.0"
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
-    "eslint": "^8.59.0",
+    "eslint": "^8.45.0",
     "prettier": "^3.1.5"
   },
   "scripts": {
