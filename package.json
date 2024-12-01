@@ -2,10 +2,10 @@
     "name": "mern-email-cover",
     "version": "1.0.0",
     "scripts": {
-      "install-client": "cd client && npm install --force --ignore-scripts",
+      "install-client": "cd client && npm install",
       "install-server": "cd server && npm install",
       "install": "npm run install-client && npm run install-server",
-      "build": "cd client && npm run build",
+      "build": "cd client && npm install && npm run build",
       "server": "cd server && node index.js",
       "start": "cd server && node index.js"
     },
