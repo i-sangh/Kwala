@@ -1,6 +1,5 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const nlp = require('compromise');
 
 puppeteer.use(StealthPlugin());
 
@@ -15,12 +14,15 @@ class HumanizeService {
             try {
                 this.browser = await puppeteer.launch({
                     headless: true,
+                    executablePath: process.env.CHROME_BIN || null,
                     args: [
                         '--no-sandbox',
                         '--disable-setuid-sandbox',
                         '--disable-dev-shm-usage',
-                        '--disable-accelerated-2d-canvas',
                         '--disable-gpu',
+                        '--headless',
+                        '--disable-software-rasterizer',
+                        '--disable-features=site-per-process',
                         '--window-size=1920x1080'
                     ],
                     protocolTimeout: 90000,
@@ -68,17 +70,6 @@ class HumanizeService {
         }
     }
 
-    // Randomized fast typing
-    async typeContent(page, selector, content) {
-        for (const char of content) {
-            await page.type(selector, char, { delay: this.randomTypingDelay(1, 3) });
-        }
-    }
-
-    randomTypingDelay(min, max) {
-        return Math.floor(Math.random() * (0.5 - 0.1 + 1)) + 0.1;
-    }
-
     async humanizeContent(content) {
         let page = null;
         try {
@@ -102,92 +93,34 @@ class HumanizeService {
 
             console.log('Typing content into textarea...');
             await page.focus(inputSelector);
-            await this.typeContent(page, inputSelector, content);
-
-            console.log('Waiting 0.5 seconds before clicking Humanize AI button...');
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            await page.type(inputSelector, content);
 
             console.log('Clicking the Humanize AI button...');
             const buttonSelector = 'button.ParaphraseButton_button__nWdlZ';
             await page.waitForSelector(buttonSelector, { timeout: 30000 });
             await page.click(buttonSelector);
 
-            console.log('Waiting 15 seconds for humanized content to be generated...');
-            await page.waitForSelector('.OutputContainer_output__wvgeh', { timeout: 30000 });
-            await new Promise((resolve) => setTimeout(resolve, 15000));
+            console.log('Waiting for humanized content...');
+            const resultSelector = '.OutputContainer_output__wvgeh';
+            await page.waitForSelector(resultSelector, { timeout: 30000 });
 
-            console.log('Extracting formatted content...');
-            const formattedContent = await page.evaluate(() => {
-                const processTextContent = (element) => {
-                    const fragments = [];
-                    let currentParagraph = [];
-                    
-                    const traverse = (node) => {
-                        if (node.nodeType === Node.TEXT_NODE) {
-                            const text = node.textContent.trim();
-                            if (text) currentParagraph.push(text);
-                        } else if (node.tagName === 'BR') {
-                            if (currentParagraph.length > 0) {
-                                fragments.push(currentParagraph.join(' '));
-                                currentParagraph = [];
-                            }
-                            fragments.push('');
-                        } else {
-                            node.childNodes.forEach(traverse);
-                            const isBlockOrSpecial = node.className && (
-                                node.className.includes('Editor_t__not_edited_long__JuNNx') ||
-                                node.className.includes('OutputContainer_output__wvgeh')
-                            );
-                            if (isBlockOrSpecial && currentParagraph.length > 0) {
-                                fragments.push(currentParagraph.join(' '));
-                                currentParagraph = [];
-                                fragments.push('');
-                            }
-                        }
-                    };
-
-                    traverse(element);
-                    
-                    if (currentParagraph.length > 0) {
-                        fragments.push(currentParagraph.join(' '));
-                    }
-
-                    return fragments;
-                };
-
-                const outputContainer = document.querySelector('.OutputContainer_output__wvgeh');
-                if (!outputContainer) return '';
-
-                const textFragments = processTextContent(outputContainer);
-                
-                return textFragments
-                    .join('\n')
-                    .replace(/\n{3,}/g, '\n')
-                    .replace(/\s+/g, ' ')
-                    .split('\n')
-                    .map(line => line.trim())
-                    .join('\n')
-                    .trim();
+            console.log('Extracting humanized content...');
+            const humanizedContent = await page.evaluate(() => {
+                const output = document.querySelector('.OutputContainer_output__wvgeh');
+                return output ? output.textContent.trim() : '';
             });
 
-            if (!formattedContent) {
+            if (!humanizedContent) {
                 throw new Error('No content generated');
             }
 
-            const finalContent = formattedContent
-                .replace(/\*\*(.*?)\*\*/g, '\n**$1**\n')
-                .replace(/\n{3,}/g, '\n\n')
-                .trim();
-
             console.log('Content humanized successfully');
-            await page.close();
-            return finalContent;
-
-        } catch (err) {
-            console.error('Error during humanization:', err);
-            throw new Error('Failed to humanize content: ' + err.message);
+            return humanizedContent;
+        } catch (error) {
+            console.error('Error during humanization:', error);
+            throw new Error('Failed to humanize content');
         } finally {
-            await this.cleanup();
+            if (page) await page.close();
         }
     }
 
@@ -195,11 +128,9 @@ class HumanizeService {
         if (this.browser) {
             try {
                 console.log('Cleaning up browser instance...');
-                const pages = await this.browser.pages();
-                await Promise.all(pages.map(page => page.close()));
                 await this.browser.close();
-            } catch (err) {
-                console.error('Cleanup error:', err);
+            } catch (error) {
+                console.error('Error during cleanup:', error);
             } finally {
                 this.browser = null;
                 this.isInitialized = false;
